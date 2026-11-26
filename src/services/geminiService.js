@@ -5,31 +5,49 @@ import { formatDateDDMMMYYYY } from '../utils/formatters';
 
 export function formatGeminiError(err) {
   const raw = err instanceof Error ? err.message : String(err || '');
+  if (raw.includes('SERVICE_DISABLED') && raw.includes('aiplatform.googleapis.com')) {
+    const urlMatch = raw.match(/https:\/\/console\.developers\.google\.com\/[^\s"']+/);
+    const link = urlMatch ? ` Enable it here: ${urlMatch[0]}` : '';
+    return `Your Vertex AI Express key (AQ....) needs Vertex AI API enabled in Google Cloud Console.${link} — OR use a free AIza... key from aistudio.google.com/apikey.`;
+  }
   if (raw.includes('API_KEY_INVALID') || raw.includes('API key not valid')) {
-    return 'Gemini API key is invalid. Please create a valid AIza... key at aistudio.google.com/apikey, paste ONLY the key (no quotes/spaces) in Settings, and verify "Generative Language API" is enabled.';
+    return 'API key not valid. Use a Gemini key (AIza...) from aistudio.google.com/apikey or a Vertex AI Express key (AQ....) with Vertex AI API enabled.';
   }
   if (raw.includes('PERMISSION_DENIED') || raw.includes('403')) {
-    return 'Gemini API key permission denied. Check API key restrictions (HTTP referrers / API restrictions) in Google Cloud Console.';
+    return 'API key permission denied. Ensure Vertex AI API / Generative Language API is enabled and unrestricted for this key.';
   }
   if (raw.includes('RESOURCE_EXHAUSTED') || raw.includes('429')) {
-    return 'Gemini API rate limit or free-tier quota reached. Wait a moment or check billing/quota in Google AI Studio.';
+    return 'Gemini API rate limit or free-tier quota reached. Wait a moment or check billing/quota.';
   }
   return raw || 'Gemini request failed. Please verify your API key in Settings.';
 }
 
-function getGeminiClient() {
-  const { geminiApiKey } = getAppConfig();
-  if (!geminiApiKey) {
+/**
+ * Automatically supports BOTH:
+ *  - Google AI Studio keys ("AIza...") -> Gemini Developer API
+ *  - Vertex AI Express keys ("AQ....") -> Vertex AI v1 Express Mode
+ */
+export function createGoogleGenAIClient(rawKey) {
+  const apiKey = sanitizeSecret(rawKey, ['VITE_GEMINI_API_KEY', 'GEMINI_API_KEY']);
+  if (!apiKey) {
     throw new Error(
       'Gemini API Key is not configured. Open Settings (top right) and add your VITE_GEMINI_API_KEY.'
     );
   }
-  if (geminiApiKey.startsWith('sb_')) {
+  if (apiKey.startsWith('sb_')) {
     throw new Error(
-      'That looks like a Supabase key (sb_...). Please paste your Google Gemini API key (starts with AIza...) from aistudio.google.com/apikey.'
+      'That looks like a Supabase key (sb_...). Please paste a Gemini key (AIza...) or Vertex AI Express key (AQ....).'
     );
   }
-  return new GoogleGenAI({ apiKey: geminiApiKey });
+  if (apiKey.startsWith('AQ.')) {
+    return new GoogleGenAI({ vertexai: true, apiVersion: 'v1', apiKey });
+  }
+  return new GoogleGenAI({ apiKey });
+}
+
+function getGeminiClient() {
+  const { geminiApiKey } = getAppConfig();
+  return createGoogleGenAIClient(geminiApiKey);
 }
 
 export function isGeminiConfigured() {
@@ -43,22 +61,20 @@ export function isGeminiConfigured() {
 export async function testGeminiApiKey(candidateKey) {
   const key = sanitizeSecret(candidateKey, ['VITE_GEMINI_API_KEY', 'GEMINI_API_KEY']);
   if (!key) {
-    throw new Error('Please paste a Gemini API key first.');
+    throw new Error('Please paste a Gemini or Vertex AI Express API key first.');
   }
   if (key.startsWith('sb_')) {
-    throw new Error('That is a Supabase Publishable key (sb_...), not a Google Gemini key (AIza...).');
-  }
-  if (!key.startsWith('AIza')) {
-    throw new Error('Google Gemini API keys from AI Studio normally start with "AIza". Please double-check the key.');
+    throw new Error('That is a Supabase Publishable key (sb_...), not a Gemini/Vertex key.');
   }
 
   try {
-    const ai = new GoogleGenAI({ apiKey: key });
+    const ai = createGoogleGenAIClient(key);
     await ai.models.generateContent({
       model: 'gemini-2.5-flash',
       contents: 'Reply with OK',
     });
-    return { ok: true, message: 'Key verified! Connected to Gemini 2.5 Flash.' };
+    const modeLabel = key.startsWith('AQ.') ? 'Vertex AI Express' : 'Google AI Studio';
+    return { ok: true, message: `Key verified (${modeLabel})! Connected to Gemini 2.5 Flash.` };
   } catch (err) {
     throw new Error(formatGeminiError(err));
   }

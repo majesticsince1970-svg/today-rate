@@ -124,7 +124,7 @@ export default function SettingsDrawer({
                   setForm((f) => ({ ...f, geminiApiKey: e.target.value }));
                   setKeyTestResult(null);
                 }}
-                placeholder="AIzaSy..."
+                placeholder="AIzaSy... or AQ...."
                 className="flex-1 rounded-xl border border-white/10 bg-black/50 px-3 py-2 font-mono text-xs text-stone-100 outline-none focus:border-gold-400/60"
               />
               <button
@@ -155,7 +155,7 @@ export default function SettingsDrawer({
             )}
 
             <p className="text-[11px] text-stone-400">
-              Get a free key (starts with <code className="text-gold-300">AIza</code>) from{' '}
+              Supports Google AI Studio keys (<code className="text-gold-300">AIza...</code>) from{' '}
               <a
                 href="https://aistudio.google.com/apikey"
                 target="_blank"
@@ -163,8 +163,8 @@ export default function SettingsDrawer({
                 className="inline-flex items-center gap-0.5 font-semibold text-gold-300 hover:underline"
               >
                 Google AI Studio <ExternalLink className="h-3 w-3" />
-              </a>
-              .
+              </a>{' '}
+              and Vertex AI Express keys (<code className="text-gold-300">AQ....</code>).
             </p>
           </div>
 

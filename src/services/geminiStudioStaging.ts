@@ -1,6 +1,5 @@
-import { GoogleGenAI } from '@google/genai';
 import { getAppConfig } from './configStore';
-import { formatGeminiError } from './geminiService';
+import { createGoogleGenAIClient, formatGeminiError } from './geminiService';
 import { imageUrlToBase64 } from '../utils/imageProcessing';
 
 export interface StudioThemeSpec {
@@ -93,13 +92,8 @@ export async function generateStudioStagedOrnament(
       'Gemini API Key is not configured. Open Settings and add your VITE_GEMINI_API_KEY to generate AI Studio backdrops.'
     );
   }
-  if (geminiApiKey.startsWith('sb_')) {
-    throw new Error(
-      'That looks like a Supabase key (sb_...). Please paste your Google Gemini API key (starts with AIza...) in Settings.'
-    );
-  }
 
-  const ai = new GoogleGenAI({ apiKey: geminiApiKey });
+  const ai = createGoogleGenAIClient(geminiApiKey);
   const { base64, mimeType } = await imageUrlToBase64(ornament.image_url);
   const standDescription = getStandDescriptionForCategory(ornament.category);
   const promptUsed = buildStudioStagingPrompt(ornament.category, theme);
