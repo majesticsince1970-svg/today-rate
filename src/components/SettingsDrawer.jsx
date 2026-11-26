@@ -12,8 +12,12 @@ import {
   Eye,
   EyeOff,
   CheckCircle2,
+  Loader2,
+  AlertCircle,
+  ExternalLink,
 } from 'lucide-react';
 import { clearAppConfigOverrides, getAppConfig, saveAppConfig } from '../services/configStore';
+import { testGeminiApiKey } from '../services/geminiService';
 
 export default function SettingsDrawer({
   open,
@@ -27,16 +31,32 @@ export default function SettingsDrawer({
 }) {
   const [form, setForm] = useState(() => getAppConfig());
   const [showKeys, setShowKeys] = useState(false);
+  const [testingKey, setTestingKey] = useState(false);
+  const [keyTestResult, setKeyTestResult] = useState(null);
   const logoRef = useRef(null);
   const audioRef = useRef(null);
 
   useEffect(() => {
     if (open) {
       setForm(getAppConfig());
+      setKeyTestResult(null);
     }
   }, [open]);
 
   if (!open) return null;
+
+  const handleTestGeminiKey = async () => {
+    setTestingKey(true);
+    setKeyTestResult(null);
+    try {
+      const res = await testGeminiApiKey(form.geminiApiKey);
+      setKeyTestResult({ ok: true, message: res.message });
+    } catch (err) {
+      setKeyTestResult({ ok: false, message: err.message || 'Key validation failed.' });
+    } finally {
+      setTestingKey(false);
+    }
+  };
 
   const handleSave = (e) => {
     e.preventDefault();
@@ -96,15 +116,55 @@ export default function SettingsDrawer({
                 {showKeys ? 'Hide' : 'Show'}
               </button>
             </div>
-            <input
-              type={showKeys ? 'text' : 'password'}
-              value={form.geminiApiKey}
-              onChange={(e) => setForm((f) => ({ ...f, geminiApiKey: e.target.value }))}
-              placeholder="AIzaSy..."
-              className="w-full rounded-xl border border-white/10 bg-black/50 px-3 py-2 font-mono text-xs text-stone-100 outline-none focus:border-gold-400/60"
-            />
+            <div className="flex gap-2">
+              <input
+                type={showKeys ? 'text' : 'password'}
+                value={form.geminiApiKey}
+                onChange={(e) => {
+                  setForm((f) => ({ ...f, geminiApiKey: e.target.value }));
+                  setKeyTestResult(null);
+                }}
+                placeholder="AIzaSy..."
+                className="flex-1 rounded-xl border border-white/10 bg-black/50 px-3 py-2 font-mono text-xs text-stone-100 outline-none focus:border-gold-400/60"
+              />
+              <button
+                type="button"
+                disabled={testingKey}
+                onClick={handleTestGeminiKey}
+                className="shrink-0 rounded-xl border border-gold-400/35 bg-gold-500/15 px-3 py-2 text-[11px] font-bold text-gold-100 transition hover:bg-gold-500/25 disabled:opacity-50"
+              >
+                {testingKey ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Test Key'}
+              </button>
+            </div>
+
+            {keyTestResult && (
+              <div
+                className={`flex items-start gap-2 rounded-lg border px-2.5 py-2 text-[11px] ${
+                  keyTestResult.ok
+                    ? 'border-emerald-500/35 bg-emerald-500/10 text-emerald-200'
+                    : 'border-rose-500/35 bg-rose-500/10 text-rose-200'
+                }`}
+              >
+                {keyTestResult.ok ? (
+                  <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-400" />
+                ) : (
+                  <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-rose-400" />
+                )}
+                <span>{keyTestResult.message}</span>
+              </div>
+            )}
+
             <p className="text-[11px] text-stone-400">
-              Powers KGSMA rate extraction (<code className="text-gold-300">gemini-2.5-flash</code>) and AI Velvet ornament staging.
+              Get a free key (starts with <code className="text-gold-300">AIza</code>) from{' '}
+              <a
+                href="https://aistudio.google.com/apikey"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-0.5 font-semibold text-gold-300 hover:underline"
+              >
+                Google AI Studio <ExternalLink className="h-3 w-3" />
+              </a>
+              .
             </p>
           </div>
 

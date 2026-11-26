@@ -1,7 +1,21 @@
 import { GoogleGenAI, Type } from '@google/genai';
-import { getAppConfig } from './configStore';
+import { getAppConfig, sanitizeSecret } from './configStore';
 import { fileToBase64 } from '../utils/imageProcessing';
 import { formatDateDDMMMYYYY } from '../utils/formatters';
+
+export function formatGeminiError(err) {
+  const raw = err instanceof Error ? err.message : String(err || '');
+  if (raw.includes('API_KEY_INVALID') || raw.includes('API key not valid')) {
+    return 'Gemini API key is invalid. Please create a valid AIza... key at aistudio.google.com/apikey, paste ONLY the key (no quotes/spaces) in Settings, and verify "Generative Language API" is enabled.';
+  }
+  if (raw.includes('PERMISSION_DENIED') || raw.includes('403')) {
+    return 'Gemini API key permission denied. Check API key restrictions (HTTP referrers / API restrictions) in Google Cloud Console.';
+  }
+  if (raw.includes('RESOURCE_EXHAUSTED') || raw.includes('429')) {
+    return 'Gemini API rate limit or free-tier quota reached. Wait a moment or check billing/quota in Google AI Studio.';
+  }
+  return raw || 'Gemini request failed. Please verify your API key in Settings.';
+}
 
 function getGeminiClient() {
   const { geminiApiKey } = getAppConfig();
@@ -10,12 +24,44 @@ function getGeminiClient() {
       'Gemini API Key is not configured. Open Settings (top right) and add your VITE_GEMINI_API_KEY.'
     );
   }
+  if (geminiApiKey.startsWith('sb_')) {
+    throw new Error(
+      'That looks like a Supabase key (sb_...). Please paste your Google Gemini API key (starts with AIza...) from aistudio.google.com/apikey.'
+    );
+  }
   return new GoogleGenAI({ apiKey: geminiApiKey });
 }
 
 export function isGeminiConfigured() {
   const { geminiApiKey } = getAppConfig();
   return Boolean(geminiApiKey && !geminiApiKey.includes('your_gemini_api_key'));
+}
+
+/**
+ * Quick 1-click key validator used by the Settings drawer.
+ */
+export async function testGeminiApiKey(candidateKey) {
+  const key = sanitizeSecret(candidateKey, ['VITE_GEMINI_API_KEY', 'GEMINI_API_KEY']);
+  if (!key) {
+    throw new Error('Please paste a Gemini API key first.');
+  }
+  if (key.startsWith('sb_')) {
+    throw new Error('That is a Supabase Publishable key (sb_...), not a Google Gemini key (AIza...).');
+  }
+  if (!key.startsWith('AIza')) {
+    throw new Error('Google Gemini API keys from AI Studio normally start with "AIza". Please double-check the key.');
+  }
+
+  try {
+    const ai = new GoogleGenAI({ apiKey: key });
+    await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: 'Reply with OK',
+    });
+    return { ok: true, message: 'Key verified! Connected to Gemini 2.5 Flash.' };
+  } catch (err) {
+    throw new Error(formatGeminiError(err));
+  }
 }
 
 /**
@@ -92,28 +138,33 @@ Extract:
 Return strictly valid JSON matching the schema.
 `.trim();
 
-  const response = await ai.models.generateContent({
-    model: 'gemini-2.5-flash',
-    contents: [
-      {
-        role: 'user',
-        parts: [
-          {
-            inlineData: {
-              mimeType,
-              data: base64,
+  let response;
+  try {
+    response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: [
+        {
+          role: 'user',
+          parts: [
+            {
+              inlineData: {
+                mimeType,
+                data: base64,
+              },
             },
-          },
-          { text: prompt },
-        ],
+            { text: prompt },
+          ],
+        },
+      ],
+      config: {
+        responseMimeType: 'application/json',
+        responseSchema,
+        temperature: 0.1,
       },
-    ],
-    config: {
-      responseMimeType: 'application/json',
-      responseSchema,
-      temperature: 0.1,
-    },
-  });
+    });
+  } catch (err) {
+    throw new Error(formatGeminiError(err));
+  }
 
   const text = response?.text;
   if (!text) {

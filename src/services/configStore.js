@@ -1,5 +1,20 @@
 const STORAGE_KEY = 'majestic_today_rate_config_v1';
 
+/**
+ * Strip accidental quotes, env-var prefixes (e.g. "VITE_GEMINI_API_KEY="),
+ * and internal spaces/newlines that frequently happen when copy-pasting keys.
+ */
+export function sanitizeSecret(raw, prefixHints = []) {
+  let s = String(raw ?? '').trim();
+  for (const prefix of prefixHints) {
+    const re = new RegExp(`^${prefix}\\s*=\\s*`, 'i');
+    s = s.replace(re, '');
+  }
+  s = s.replace(/^["'`]+|["'`]+$/g, '');
+  s = s.replace(/\s+/g, '');
+  return s;
+}
+
 export function getAppConfig() {
   let saved = {};
   try {
@@ -11,16 +26,16 @@ export function getAppConfig() {
 
   return {
     geminiApiKey:
-      (saved.geminiApiKey ?? '').trim() ||
-      (import.meta.env.VITE_GEMINI_API_KEY ?? '').trim() ||
+      sanitizeSecret(saved.geminiApiKey, ['VITE_GEMINI_API_KEY', 'GEMINI_API_KEY']) ||
+      sanitizeSecret(import.meta.env.VITE_GEMINI_API_KEY, ['VITE_GEMINI_API_KEY', 'GEMINI_API_KEY']) ||
       '',
     supabaseUrl:
-      (saved.supabaseUrl ?? '').trim() ||
-      (import.meta.env.VITE_SUPABASE_URL ?? '').trim() ||
+      sanitizeSecret(saved.supabaseUrl, ['VITE_SUPABASE_URL', 'SUPABASE_URL']) ||
+      sanitizeSecret(import.meta.env.VITE_SUPABASE_URL, ['VITE_SUPABASE_URL', 'SUPABASE_URL']) ||
       '',
     supabaseAnonKey:
-      (saved.supabaseAnonKey ?? '').trim() ||
-      (import.meta.env.VITE_SUPABASE_ANON_KEY ?? '').trim() ||
+      sanitizeSecret(saved.supabaseAnonKey, ['VITE_SUPABASE_ANON_KEY', 'SUPABASE_ANON_KEY']) ||
+      sanitizeSecret(import.meta.env.VITE_SUPABASE_ANON_KEY, ['VITE_SUPABASE_ANON_KEY', 'SUPABASE_ANON_KEY']) ||
       '',
     exportFps: Number(saved.exportFps) === 60 ? 60 : 30,
     autoPickRandom: Boolean(saved.autoPickRandom),
@@ -35,7 +50,19 @@ export function saveAppConfig(partial) {
   } catch {
     existing = {};
   }
-  const next = { ...existing, ...partial };
+
+  const cleaned = { ...partial };
+  if ('geminiApiKey' in cleaned) {
+    cleaned.geminiApiKey = sanitizeSecret(cleaned.geminiApiKey, ['VITE_GEMINI_API_KEY', 'GEMINI_API_KEY']);
+  }
+  if ('supabaseUrl' in cleaned) {
+    cleaned.supabaseUrl = sanitizeSecret(cleaned.supabaseUrl, ['VITE_SUPABASE_URL', 'SUPABASE_URL']);
+  }
+  if ('supabaseAnonKey' in cleaned) {
+    cleaned.supabaseAnonKey = sanitizeSecret(cleaned.supabaseAnonKey, ['VITE_SUPABASE_ANON_KEY', 'SUPABASE_ANON_KEY']);
+  }
+
+  const next = { ...existing, ...cleaned };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
   return getAppConfig();
 }
