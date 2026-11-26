@@ -1,0 +1,51 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html,
+  body {
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    background-color: #090a0d;
+    color: #f5f2ea;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Custom subtle dark-gold scrollbars */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #111216;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #2f2b22;
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #845515;
+  }
+}
+
+@layer utilities {
+  .gold-text-gradient {
+    background: linear-gradient(120deg, #fff5cc 0%, #e5bc5b 48%, #c99220 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .gold-btn {
+    background: linear-gradient(135deg, #f2de9e 0%, #dfb654 45%, #b37c1a 100%);
+    color: #181105;
+  }
+  .gold-btn:hover {
+    background: linear-gradient(135deg, #fdf1c8 0%, #eac362 45%, #c58a21 100%);
+  }
+  .studio-card {
+    background: linear-gradient(180deg, rgba(25, 26, 32, 0.94) 0%, rgba(16, 17, 21, 0.96) 100%);
+    border: 1px solid rgba(229, 188, 91, 0.14);
+  }
+  .safe-bottom {
+    padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+  }
+}
